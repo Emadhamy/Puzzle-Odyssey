@@ -1,0 +1,87 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+env:
+  UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+  UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+  UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+
+jobs:
+  build-android:
+    name: Build for Android 📱
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Checkout
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        lfs: true
+    
+    # Cache
+    - name: Cache Library
+      uses: actions/cache@v3
+      with:
+        path: Library
+        key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+        restore-keys: |
+          Library-
+    
+    # Build
+    - name: Build project
+      uses: game-ci/unity-builder@v4
+      env:
+        UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+        UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      with:
+        targetPlatform: Android
+        buildName: PuzzleOdyssey-v${{ github.event.inputs.version || '1.0.0' }}
+        versioning: Semantic
+        
+    # Upload Artifact
+    - name: Upload APK
+      uses: actions/upload-artifact@v3
+      with:
+        name: PuzzleOdyssey-Android
+        path: build/Android/*.apk
+        
+    # Upload to Release (only on main/master branch)
+    - name: Create Release
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      uses: softprops/action-gh-release@v1
+      with:
+        files: build/Android/*.apk
+        tag_name: v${{ github.event.inputs.version || '1.0.0' }}
+        name: Puzzle Odyssey v${{ github.event.inputs.version || '1.0.0' }}
+        body: |
+          ## Puzzle Odyssey - Android Release 🎮
+          
+          ### What's New:
+          - 50 exciting levels
+          - 5 unique challenge types
+          - Special blocks: Ice, Jewels, and Time Bombs
+          - Star rating system
+          - Smooth animations and transitions
+          
+          ### Installation:
+          1. Download the APK file
+          2. Enable "Install from Unknown Sources" in Android settings
+          3. Install and enjoy!
+          
+          ### Requirements:
+          - Android 8.0 (API 26) or higher
+          - 100MB free space
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
